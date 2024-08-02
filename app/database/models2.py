@@ -11,4 +11,8 @@ class Operation(db.Entity):
     time = Required(float)
     start_time = Optional(datetime)
     end_time = Optional(datetime)
+    # quantity = Required(int)
+
+class ComponentQuantity(db.Entity):
+    component = Required(str, unique=True)
     quantity = Required(int)

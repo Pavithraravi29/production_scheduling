@@ -1,7 +1,7 @@
 import streamlit as st
 import plotly.express as px
 from datetime import datetime, timedelta
-from app.main import fetch_operations, insert_operations, schedule_operations, OperationIn
+from app.main2 import fetch_operations, insert_operations, schedule_operations, OperationIn
 
 
 st.title("Production Schedule Gantt Chart")
@@ -28,8 +28,8 @@ if op_type == 'Other':
     custom_type = st.sidebar.text_input("Enter Custom Type")
     if custom_type:
         # Insert the custom type into the database
-        insert_operations([OperationIn(component='', description='', type=custom_type, machine='', time=0, quantity='')])
-        st.sidebar.success(f"Custom Type '{custom_type}' Added Successfully!")
+        # insert_operations([OperationIn(component='', description='', type=custom_type, machine='', time=0, quantity='')])
+        # st.sidebar.success(f"Custom Type '{custom_type}' Added Successfully!")
         op_type = custom_type
 
 machine_options = df['machine'].unique().tolist() + ['Other']
@@ -54,9 +54,20 @@ if st.sidebar.button("Add Operation"):
 st.write("Scheduled Operations:")
 st.write(schedule_df)
 
+
+# Function to format overall time and end time
+def format_time(minutes):
+    delta = timedelta(minutes=minutes)
+    days = delta.days
+    hours, remainder = divmod(delta.seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{days} days, {hours:02}:{minutes:02}:{seconds:02}"
+
+
 # Print overall time
-st.write(f"Overall Time to Complete All Components: {overall_time:.2f} minutes")
-st.write(f"Completion Time: {overall_end_time}")
+formatted_time = format_time(overall_time)
+st.write(f"Overall Time to Complete All Components: {formatted_time}")
+st.write(f"Completion Time: {overall_end_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
 # Gantt chart visualization using Streamlit and Plotly
 def plot_gantt_chart(schedule_df, overall_end_time):
@@ -66,6 +77,7 @@ def plot_gantt_chart(schedule_df, overall_end_time):
         x_end="end_time",
         y="machine",
         color="component",
+        hover_data={"quantity": True,  "description": True},
         labels={"component": "Component", "description": "Operation", "quantity": "quantity"}
     )
     fig.update_yaxes(categoryorder="total ascending")
@@ -74,3 +86,7 @@ def plot_gantt_chart(schedule_df, overall_end_time):
 
 # Render the Gantt chart
 st.plotly_chart(plot_gantt_chart(schedule_df, overall_end_time))
+
+
+# To Run
+# streamlit run streamlit_app.py

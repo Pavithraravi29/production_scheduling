@@ -1,238 +1,142 @@
-from fastapi import FastAPI, HTTPException
+from typing import List
+from fastapi import FastAPI
 from pydantic import BaseModel
 from datetime import datetime, timedelta
-from typing import List
-from app.database.config import configure_database
-from app.database.models import Operation
-from pony.orm import db_session, select, commit
-import pandas as pd
+from fastapi.middleware.cors import CORSMiddleware
+
+# Define a model for operations
+class Operation(BaseModel):
+    description: str
+    type: str
+    machine: str
+    time: float  # Assuming time is in minutes
+
+
+# Define a model for components
+class Component(BaseModel):
+    name: str
+    quantity: int
+    operations: List[Operation]
+
+
+# Your component data
+components_data = [
+    {
+        "name": "Component1",
+        "quantity": 100,
+        "operations": [
+            {"description": "Facing A Side", "type": "Operation", "machine": "Turning Centre", "time": 1},
+            {"description": "OD Turning from A side", "type": "Operation", "machine": "Turning Centre", "time": 2},
+            {"description": "Centre Drilling Face A", "type": "Operation", "machine": "Turning Centre", "time": 1},
+            {"description": "Job Rotation", "type": "Setup", "machine": "Turning Centre", "time": 0.5},
+            {"description": "Facing B Side", "type": "Operation", "machine": "Turning Centre", "time": 1},
+            {"description": "OD Turning from B side", "type": "Operation", "machine": "Turning Centre", "time": 2},
+            {"description": "Centre Drilling Face B", "type": "Operation", "machine": "Turning Centre", "time": 1},
+            {"description": "Hold Job between centres", "type": "Setup", "machine": "Turning Centre", "time": 0.5},
+            {"description": "Step & Profile turning", "type": "Operation", "machine": "Turning Centre", "time": 4},
+            {"description": "Through Drill", "type": "Operation", "machine": "Turning Centre", "time": 1.5},
+            {"description": "ID Boring", "type": "Operation", "machine": "Turning Centre", "time": 4},
+            {"description": "Thread Machining", "type": "Operation", "machine": "Turning Centre", "time": 3},
+            {"description": "Clamping job in V Block/Vice", "type": "Setup", "machine": "VMC", "time": 1},
+            {"description": "Face Milling", "type": "Operation", "machine": "VMC", "time": 1},
+            {"description": "End Milling", "type": "Operation", "machine": "VMC", "time": 3},
+            {"description": "Pocket Milling", "type": "Operation", "machine": "VMC", "time": 3},
+            {"description": "Mount Job A Side Vertically", "type": "Setup", "machine": "VMC", "time": 0.5},
+            {"description": "Drilling A Side", "type": "Operation", "machine": "VMC", "time": 1.5},
+            {"description": "Rotate Job B Side Vertically", "type": "Setup", "machine": "VMC", "time": 0.5},
+            {"description": "Drilling B Side", "type": "Operation", "machine": "VMC", "time": 1.5},
+            {"description": "OD Grinding", "type": "Operation", "machine": "Cylindrical OD Grinder", "time": 2},
+            {"description": "ID Grinding", "type": "Operation", "machine": "Cylindrical ID Grinder", "time": 2},
+        ]
+    },
+    {
+        "name": "Component2",
+        "quantity": 200,
+        "operations": [
+            {"description": "Clamp Block in Vice", "type": "Setup", "machine": "HMC", "time": 2},
+            {"description": "Face Mill M Side", "type": "Operation", "machine": "HMC", "time": 1.5},
+            {"description": "Area Mill M Side", "type": "Operation", "machine": "HMC", "time": 4},
+            {"description": "End Mill A B C & D Sides", "type": "Operation", "machine": "HMC", "time": 4},
+            {"description": "Area Mill A, B, C and D Sides", "type": "Operation", "machine": "HMC", "time": 12},
+            {"description": "Centre Drilling A Side", "type": "Operation", "machine": "HMC", "time": 1},
+            {"description": "Through Drilling A Side", "type": "Operation", "machine": "HMC", "time": 3},
+            {"description": "Centre Drilling B Side", "type": "Operation", "machine": "HMC", "time": 1},
+            {"description": "Through Drilling B Side", "type": "Operation", "machine": "HMC", "time": 3},
+            {"description": "Centre Drilling (2 small Holes) A Side", "type": "Operation", "machine": "HMC", "time": 1},
+            {"description": "Through Drilling 2 Holes A Side", "type": "Operation", "machine": "HMC", "time": 2.5},
+            {"description": "Centre Drilling (2 small Holes) C Side", "type": "Operation", "machine": "HMC", "time": 1},
+            {"description": "Through Drilling 2 Holes C Side", "type": "Operation", "machine": "HMC", "time": 2.5},
+            {"description": "Rotate Job with Face N Top", "type": "Setup", "machine": "HMC", "time": 2},
+            {"description": "Face Milling N Side", "type": "Operation", "machine": "HMC", "time": 2},
+            {"description": "Area Milling N Side", "type": "Operation", "machine": "HMC", "time": 4},
+        ]
+    },
+    {
+        "name": "Component3",
+        "quantity": 150,
+        "operations": [
+            {"description": "Facing A Side", "type": "Operation", "machine": "Turning Centre", "time": 3},
+            {"description": "OD Turning from A side", "type": "Operation", "machine": "Turning Centre", "time": 3},
+            {"description": "Job Rotation", "type": "Setup", "machine": "Turning Centre", "time": 1},
+            {"description": "Facing B Side", "type": "Operation", "machine": "Turning Centre", "time": 3},
+            {"description": "OD Turning from B side", "type": "Operation", "machine": "Turning Centre", "time": 3},
+            {"description": "Centre Drilling Face B", "type": "Operation", "machine": "Turning Centre", "time": 1.5},
+            {"description": "Through Drill", "type": "Operation", "machine": "Turning Centre", "time": 4},
+            {"description": "ID Boring", "type": "Operation", "machine": "Turning Centre", "time": 12},
+            {"description": "Mounting on Fixture", "type": "Setup", "machine": "VMC", "time": 3},
+            {"description": "PCD Holes drilling (Set 1)", "type": "Operation", "machine": "VMC", "time": 6},
+            {"description": "PCD Holes drilling (Set 2)", "type": "Operation", "machine": "VMC", "time": 5},
+            {"description": "Mount job on HMC with Rotary table", "type": "Setup", "machine": "HMC", "time": 3},
+            {"description": "Face milling of outer periphery-360", "type": "Operation", "machine": "HMC", "time": 5},
+            {"description": "Cavity Milling on outer periphery-360", "type": "Operation", "machine": "HMC", "time": 12},
+            {"description": "Centre Holes drilling on Face C D E & F", "type": "Operation", "machine": "HMC",
+             "time": 3.5},
+            {"description": "Through Drilling on Face C D E & F", "type": "Operation", "machine": "HMC", "time": 8},
+            {"description": "ID Thread Machining on Face C D E & F", "type": "Operation", "machine": "HMC", "time": 4},
+            {"description": "ID Grind on Bore", "type": "Operation", "machine": "Grinding", "time": 3.5},
+        ]
+    }
+]
 
 app = FastAPI()
 
-configure_database()
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Update with your frontend URL
+    allow_credentials=True,
+    allow_methods=["GET"],
+    allow_headers=["*"],
+)
 
-# Pydantic models
-class OperationIn(BaseModel):
-    component: str
-    description: str
-    type: str
-    machine: str
-    time: float
-    quantity: str
+# Endpoint to get scheduling results
+@app.get("/schedule")
+def get_schedule():
+    schedule_results = {}
+    current_time = datetime.now()
 
-# Define a model to handle multiple operations
-class OperationsIn(BaseModel):
-    operations: List[OperationIn]
+    for component_data in components_data:
+        component_name = component_data["name"]
+        schedule_results[component_name] = {"operations": []}
 
-class OperationOut(BaseModel):
-    component: str
-    description: str
-    type: str
-    machine: str
-    start_time: datetime
-    end_time: datetime
-    quantity: str
+        for operation in component_data["operations"]:
+            start_time = current_time
+            end_time = start_time + timedelta(minutes=operation["time"])
 
+            schedule_results[component_name]["operations"].append({
+                "description": operation["description"],
+                "machine": operation["machine"],
+                "start_time": start_time.isoformat(),
+                "end_time": end_time.isoformat()
+            })
 
+            current_time = end_time  # Update current time for next operation
 
-# Function to fetch operations from the database
-@db_session
-def fetch_operations():
-    operations = select(op for op in Operation).order_by(lambda op: op.id)[:]  # Order by 'id'
-
-    operations_list = [
-        (op.id, op.component, op.description, op.type, op.machine, op.time, op.start_time, op.end_time, op.quantity) for op in
-        operations
-    ]
-
-    df = pd.DataFrame(
-        operations_list,
-        columns=["id", "component", "description", "type", "machine", "time", "start_time", "end_time", "quantity"],
-    )
-    return df
+    return schedule_results
 
 
-# Function to insert a new operation into the database
-@db_session
-def insert_operations(operations: List[OperationIn]) -> List[OperationOut]:
-    now = datetime.now()
-    results = []
-    for operation in operations:
-        end_time = now + timedelta(minutes=operation.time)
-        new_operation = Operation(
-            component=operation.component,
-            description=operation.description,
-            type=operation.type,
-            machine=operation.machine,
-            time=operation.time,
-            start_time=now,
-            end_time=end_time,
-            quantity=operation.quantity,
-        )
-        results.append(OperationOut(
-            component=new_operation.component,
-            description=new_operation.description,
-            type=new_operation.type,
-            machine=new_operation.machine,
-            start_time=new_operation.start_time,
-            end_time=new_operation.end_time,
-            quantity=new_operation.quantity,
-        ))
-    commit()
-    return results
+if __name__ == "__main__":
+    import uvicorn
 
+    uvicorn.run(app, host="172.18.101.47", port=1234)
 
-# Function to schedule operations
-def schedule_operations(df: pd.DataFrame) -> (pd.DataFrame, datetime, float):
-    if df.empty:
-        return pd.DataFrame(), datetime.now(), 0.0
-
-    # Sort DataFrame by 'id' to maintain the sequence as stored in the database
-    df_sorted = df.sort_values(by='id')
-
-    schedule = []
-    machine_end_times = {machine: df_sorted['start_time'].min() for machine in df_sorted["machine"].unique()}
-    component_end_times = {component: df_sorted['start_time'].min() for component in df_sorted["component"].unique()}
-    component_last_end_time = {component: df_sorted['start_time'].min() for component in df_sorted["component"].unique()}
-
-    for component, component_df in df_sorted.groupby('component'):
-        component_df = component_df.sort_values(by='id')  # Ensure operations within component are in order
-
-        for _, row in component_df.iterrows():
-            description, op_type, machine, time, start_time, quantity = row[
-                ["description", "type", "machine", "time", "start_time", "quantity"]
-            ]
-            start_time = max(start_time, component_last_end_time[component])  # Use last end time for the component
-
-            # Check machine availability
-            if start_time < machine_end_times[machine]:
-                start_time = machine_end_times[machine]
-
-            end_time = start_time + timedelta(minutes=time)
-            schedule.append(
-                [
-                    component,
-                    description,
-                    op_type,
-                    machine,
-                    start_time,
-                    end_time,
-                    quantity  # Include quantity in the schedule
-                ]
-            )
-            component_last_end_time[component] = end_time
-            machine_end_times[machine] = end_time
-            component_end_times[component] = max(component_end_times[component], end_time)
-
-    schedule_df = pd.DataFrame(
-        schedule,
-        columns=[
-            "component",
-            "description",
-            "type",
-            "machine",
-            "start_time",
-            "end_time",
-            "quantity"  # Add quantity column to DataFrame columns
-        ],
-    )
-
-    # Calculate total time
-    overall_end_time = max(component_end_times.values())
-    overall_time = (overall_end_time - df_sorted['start_time'].min()).total_seconds() / 60
-
-    return schedule_df, overall_end_time, overall_time
-
-
-
-# def schedule_operations(df: pd.DataFrame) -> (pd.DataFrame, datetime, float):
-#     if df.empty:
-#         return pd.DataFrame(), datetime.now(), 0.0
-#
-#     # Convert 'quantity' to numeric type (float or int)
-#     df['quantity'] = pd.to_numeric(df['quantity'], errors='coerce')  # Convert to numeric, coerce errors to NaN
-#
-#     # Drop rows where 'quantity' could not be converted (if any)
-#     df = df.dropna(subset=['quantity'])
-#
-#     # Calculate total workload for each operation
-#     df['total_workload'] = df['time'] * df['quantity']
-#
-#     # Sort operations by total workload in descending order
-#     df_sorted = df.sort_values(by=['component', 'total_workload'], ascending=[True, False])
-#
-#     schedule = []
-#     machine_end_times = {machine: df_sorted['start_time'].min() for machine in df_sorted["machine"].unique()}
-#     component_end_times = {component: df_sorted['start_time'].min() for component in df_sorted["component"].unique()}
-#     component_last_end_time = {component: df_sorted['start_time'].min() for component in df_sorted["component"].unique()}
-#
-#     for component, component_df in df_sorted.groupby('component'):
-#         component_df = component_df.sort_values(by='total_workload', ascending=False)  # Sort by workload
-#
-#         for _, row in component_df.iterrows():
-#             description, op_type, machine, time, start_time, quantity = row[
-#                 ["description", "type", "machine", "time", "start_time", "quantity"]
-#             ]
-#             start_time = max(start_time, component_last_end_time[component])  # Use last end time for the component
-#
-#             # Check machine availability
-#             if start_time < machine_end_times[machine]:
-#                 start_time = machine_end_times[machine]
-#
-#             end_time = start_time + timedelta(minutes=time * quantity)
-#             schedule.append(
-#                 [
-#                     component,
-#                     description,
-#                     op_type,
-#                     machine,
-#                     start_time,
-#                     end_time,
-#                     quantity
-#                 ]
-#             )
-#             component_last_end_time[component] = end_time
-#             machine_end_times[machine] = end_time
-#             component_end_times[component] = max(component_end_times[component], end_time)
-#
-#     schedule_df = pd.DataFrame(
-#         schedule,
-#         columns=[
-#             "component",
-#             "description",
-#             "type",
-#             "machine",
-#             "start_time",
-#             "end_time",
-#             "quantity"
-#         ],
-#     )
-#
-#     # Calculate total time
-#     overall_end_time = max(component_end_times.values())
-#     overall_time = (overall_end_time - df_sorted['start_time'].min()).total_seconds() / 60
-#
-#     return schedule_df, overall_end_time, overall_time
-
-
-
-# Routes
-@app.get("/operations/", response_model=List[OperationOut])
-async def read_operations():
-    df = fetch_operations()
-    operations = df.to_dict(orient="records")
-    return operations
-
-
-@app.post("/operations/",  response_model=List[OperationOut])
-async def create_operations(operations: OperationsIn):
-    op_out = insert_operations(operations.operations)
-    return op_out
-
-
-@app.get("/schedule/", response_model=List[OperationOut])
-async def schedule():
-    df = fetch_operations()
-    schedule_df, overall_end_time, overall_time = schedule_operations(df)
-    scheduled_operations = schedule_df.to_dict(orient="records")
-    return scheduled_operations
