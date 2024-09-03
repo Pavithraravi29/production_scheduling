@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import plotly.graph_objects as go
 
 # Assuming these are correctly imported from your app.main3
-from app.main3 import fetch_operations, insert_operations, schedule_operations, OperationIn, fetch_component_quantities
+from app.main1 import fetch_operations, insert_operations, schedule_operations, OperationIn, fetch_component_quantities
 
 st.set_page_config(layout="wide", page_title="Production Schedule Dashboard")
 
