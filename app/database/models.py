@@ -17,3 +17,6 @@ class ComponentQuantity(db.Entity):
     component = Required(str, unique=True)
     quantity = Required(int)
 
+class LeadTime(db.Entity):
+    component = Required(str, unique=True)
+    due_date = Required(datetime)

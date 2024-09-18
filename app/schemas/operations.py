@@ -17,6 +17,7 @@ class OperationOut(BaseModel):
     description: str
     type: str
     machine: str
+    time: float
     start_time: datetime
     end_time: datetime
 

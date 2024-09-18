@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database.config import configure_database
-from app.routers import operations, component_quantities
+from app.routers import operations, component_quantities, leadtime
 
 app = FastAPI()
 
@@ -19,10 +19,9 @@ app.add_middleware(
 configure_database()
 
 
-
 app.include_router(operations.router, tags=["operations/production"])
 app.include_router(component_quantities.router, tags=["component_quantities"])
-
+app.include_router(leadtime.router, tags=["leadtime"])
 
 
 # TO RUN

@@ -1,11 +1,11 @@
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Query
-from typing import List, Optional
+from typing import List, Optional, Union, Dict, Any
 from app.schemas.operations import OperationOut, OperationsIn, OperationOut1, DailyProductionOut, MachineSchedulesOut
 from app.crud.operations import fetch_operations, insert_operations
 from app.algorithms.scheduling import schedule_operations
 from app.crud.component_quantities import fetch_component_quantities
-
+from app.crud.leadtime import fetch_lead_times
 
 router = APIRouter()
 
@@ -15,7 +15,7 @@ async def read_operations():
     operations = df.to_dict(orient="records")
     return operations
 
-@router.post("/post_operations/", response_model=List[OperationOut])
+@router.post("/post_operations/", response_model=List[Union[OperationOut, Dict[str, Any]]])
 async def create_operations(operations: OperationsIn):
     op_out = insert_operations(operations.operations)
     return op_out
@@ -24,7 +24,8 @@ async def create_operations(operations: OperationsIn):
 async def schedule():
     df = fetch_operations()
     component_quantities = fetch_component_quantities()
-    schedule_df, overall_end_time, overall_time, daily_production = schedule_operations(df, component_quantities)
+    lead_times = fetch_lead_times()
+    schedule_df, overall_end_time, overall_time, daily_production, component_status = schedule_operations(df, component_quantities, lead_times)
     scheduled_operations = schedule_df.to_dict(orient="records")
     return scheduled_operations
 
@@ -33,10 +34,15 @@ async def get_machine_schedules(
         start_date: Optional[datetime] = Query(None),
         end_date: Optional[datetime] = Query(None)
 ):
+    # Fetch necessary data
     df = fetch_operations()
     component_quantities = fetch_component_quantities()
+    lead_times = fetch_lead_times()  # Fetch the lead times for components
 
-    schedule_df, overall_end_time, overall_time, daily_production = schedule_operations(df, component_quantities)
+    # Call schedule_operations with the required lead_times argument
+    schedule_df, overall_end_time, overall_time, daily_production, component_status = schedule_operations(
+        df, component_quantities, lead_times
+    )
 
     # Ensure that start_date and end_date are handled as inclusive
     if start_date:
@@ -65,13 +71,12 @@ async def get_machine_schedules(
 @router.get("/daily_production/", response_model=DailyProductionOut)
 async def daily_production():
     df = fetch_operations()
-    # component_quantities = {"Component1": 10, "Component2": 10, "Component3": 10, "Component 4": 10, "Component 5": 10,"Component 6": 10, "Component 7": 10, "Component 8": 10}  # Define the quantities here
     component_quantities = fetch_component_quantities()
-    _, overall_end_time, overall_time, daily_production = schedule_operations(df, component_quantities)
+    lead_times = fetch_lead_times()  # Add this line to fetch lead times
+    _, overall_end_time, overall_time, daily_production, _ = schedule_operations(df, component_quantities, lead_times)  # Update this line
 
     # Convert overall_end_time from Timestamp to string
-    formatted_end_time = overall_end_time.strftime("%Y-%m-%d %H:%M") if isinstance(overall_end_time, datetime) else str(
-        overall_end_time)
+    formatted_end_time = overall_end_time.strftime("%Y-%m-%d %H:%M") if isinstance(overall_end_time, datetime) else str(overall_end_time)
 
     # Convert overall_time from minutes to d h m format
     delta = timedelta(minutes=overall_time)
