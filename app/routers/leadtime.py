@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter
 from numpy import select
 from pony.orm import db_session
@@ -19,13 +19,19 @@ async def get_component_status():
     df = fetch_operations()
     component_quantities = fetch_component_quantities()
     lead_times = fetch_lead_times()
-    _, _, _, _, component_status = schedule_operations(df, component_quantities, lead_times)
+    _, _, _, _, component_status, _ = schedule_operations(df, component_quantities, lead_times)
 
     early_complete = []
     on_time_complete = []
     delayed_complete = []
 
     for comp, status in component_status.items():
+        scheduled_end_time: Optional[datetime] = status.get('scheduled_end_time')
+
+        if scheduled_end_time is None:
+            # Handle missing or invalid scheduled_end_time
+            continue  # Skip this component, or handle it as per your needs
+
         component = ComponentStatus(
             component=comp,
             scheduled_end_time=status['scheduled_end_time'],

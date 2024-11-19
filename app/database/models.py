@@ -20,3 +20,13 @@ class ComponentQuantity(db.Entity):
 class LeadTime(db.Entity):
     component = Required(str, unique=True)
     due_date = Required(datetime)
+
+class RawMaterial(db.Entity):
+    name = Required(str, unique=True)
+    available = Required(bool)
+    available_from = Optional(datetime)  # New field
+
+class MachineStatus(db.Entity):
+    machine = Required(str, unique=True)
+    status = Required(str)  # 'ON' or 'OFF'
+    available_from = Optional(datetime)  # New field

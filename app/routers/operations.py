@@ -1,11 +1,16 @@
 from datetime import datetime, timedelta
+import pandas as pd
+import pytz
 from fastapi import APIRouter, Query
 from typing import List, Optional, Union, Dict, Any
-from app.schemas.operations import OperationOut, OperationsIn, OperationOut1, DailyProductionOut, MachineSchedulesOut
+from pydantic import BaseModel
+from app.schemas.operations import OperationOut, OperationsIn, DailyProductionOut, MachineSchedulesOut
 from app.crud.operations import fetch_operations, insert_operations
 from app.algorithms.scheduling import schedule_operations
 from app.crud.component_quantities import fetch_component_quantities
 from app.crud.leadtime import fetch_lead_times
+from app.schemas.dynamic_scheduling import OperationOut1
+from app.crud.dynamic_scheduling import fetch_raw_materials, fetch_machine_statuses
 
 router = APIRouter()
 
@@ -25,9 +30,18 @@ async def schedule():
     df = fetch_operations()
     component_quantities = fetch_component_quantities()
     lead_times = fetch_lead_times()
-    schedule_df, overall_end_time, overall_time, daily_production, component_status = schedule_operations(df, component_quantities, lead_times)
+    schedule_df, overall_end_time, overall_time, daily_production, component_status, removed_components = schedule_operations(df, component_quantities, lead_times)
     scheduled_operations = schedule_df.to_dict(orient="records")
     return scheduled_operations
+
+# @router.get("/removed_components/", response_model=List[str])
+# async def get_removed_components():
+#     df = fetch_operations()
+#     component_quantities = fetch_component_quantities()
+#     lead_times = fetch_lead_times()
+#     _, _, _, _, _, removed_components = schedule_operations(df, component_quantities, lead_times)
+#     return removed_components
+
 
 @router.get("/machine_schedules/", response_model=MachineSchedulesOut)
 async def get_machine_schedules(
@@ -40,7 +54,7 @@ async def get_machine_schedules(
     lead_times = fetch_lead_times()  # Fetch the lead times for components
 
     # Call schedule_operations with the required lead_times argument
-    schedule_df, overall_end_time, overall_time, daily_production, component_status = schedule_operations(
+    schedule_df, overall_end_time, overall_time, daily_production, component_status, removed_components = schedule_operations(
         df, component_quantities, lead_times
     )
 
@@ -73,7 +87,7 @@ async def daily_production():
     df = fetch_operations()
     component_quantities = fetch_component_quantities()
     lead_times = fetch_lead_times()  # Add this line to fetch lead times
-    _, overall_end_time, overall_time, daily_production, _ = schedule_operations(df, component_quantities, lead_times)  # Update this line
+    _, overall_end_time, overall_time, daily_production, _, _ = schedule_operations(df, component_quantities, lead_times)  # Update this line
 
     # Convert overall_end_time from Timestamp to string
     formatted_end_time = overall_end_time.strftime("%Y-%m-%d %H:%M") if isinstance(overall_end_time, datetime) else str(overall_end_time)
@@ -95,3 +109,100 @@ async def daily_production():
         "daily_production": daily_production,
         "total_components": total_components
     }
+
+
+class ScheduleValidationItem(BaseModel):
+    datetime: datetime
+    machine: str
+    component: str
+    quantity: int
+
+
+class ScheduleValidationRequest(BaseModel):
+    items: List[ScheduleValidationItem]
+
+
+class ValidationResult(BaseModel):
+    datetime: datetime
+    machine: str
+    component: str
+    requested_quantity: int
+    scheduled_quantity: int
+    status: str
+    message: str
+
+
+@router.post("/validate-schedule", response_model=List[ValidationResult])
+async def validate_schedule(request: ScheduleValidationRequest):
+    # Fetch necessary data
+    operations_df = fetch_operations()
+    component_quantities = fetch_component_quantities()
+    lead_times = fetch_lead_times()
+
+    # Generate schedule
+    schedule_df, _, _, _, _ = schedule_operations(operations_df, component_quantities, lead_times)
+
+    # Ensure all datetime columns in schedule_df are tz-aware
+    for col in ['start_time', 'end_time']:
+        if schedule_df[col].dt.tz is None:
+            schedule_df[col] = schedule_df[col].dt.tz_localize(pytz.UTC)
+
+    results = []
+
+    for item in request.items:
+        # Convert request datetime to pandas Timestamp
+        request_datetime = pd.Timestamp(item.datetime)
+
+        # If request_datetime is naive, assume it's in UTC
+        if request_datetime.tz is None:
+            request_datetime = request_datetime.tz_localize(pytz.UTC)
+
+        # Filter schedule for the given datetime, machine, and component
+        filtered_schedule = schedule_df[
+            (schedule_df['start_time'] <= request_datetime) &
+            (schedule_df['end_time'] > request_datetime) &
+            (schedule_df['machine'] == item.machine) &
+            (schedule_df['component'] == item.component)
+            ]
+
+        print(filtered_schedule)
+
+        if filtered_schedule.empty:
+            results.append(ValidationResult(
+                datetime=item.datetime,
+                machine=item.machine,
+                component=item.component,
+                requested_quantity=item.quantity,
+                scheduled_quantity=0,
+                status="Not OK",
+                message="No matching schedule found for the given parameters"
+            ))
+        else:
+            # Extract the scheduled quantity
+            scheduled_quantity = filtered_schedule['quantity'].iloc[0]
+
+            # Parse the quantity string (e.g., "1/5") to get the current quantity
+            current_quantity = int(scheduled_quantity.split('/')[0])
+
+            if current_quantity == item.quantity:
+                results.append(ValidationResult(
+                    datetime=item.datetime,
+                    machine=item.machine,
+                    component=item.component,
+                    requested_quantity=item.quantity,
+                    scheduled_quantity=current_quantity,
+                    status="OK",
+                    message="The requested quantity matches the schedule"
+                ))
+            else:
+                results.append(ValidationResult(
+                    datetime=item.datetime,
+                    machine=item.machine,
+                    component=item.component,
+                    requested_quantity=item.quantity,
+                    scheduled_quantity=current_quantity,
+                    status="Not OK",
+                    message=f"Quantity mismatch. Scheduled: {current_quantity}, Requested: {item.quantity}"
+                ))
+
+    return results

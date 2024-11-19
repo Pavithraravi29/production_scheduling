@@ -1,9 +1,7 @@
-import os
-from fastapi.staticfiles import StaticFiles
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database.config import configure_database
-from app.routers import operations, component_quantities, leadtime
+from app.routers import operations, component_quantities, leadtime, dynamic_scheduling
 
 app = FastAPI()
 
@@ -24,7 +22,7 @@ configure_database()
 app.include_router(operations.router, tags=["operations/production"])
 app.include_router(component_quantities.router, tags=["component_quantities"])
 app.include_router(leadtime.router, tags=["leadtime"])
-
+app.include_router(dynamic_scheduling.router,tags=["rawmaterial/machinestatus"])
 
 # TO RUN
-# uvicorn app.main:app --host 172.18.7.85 --port 4567 --reload
+# uvicorn app.main:app --host 172.18.7.85 --port 1304 --reload

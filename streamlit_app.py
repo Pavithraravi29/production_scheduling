@@ -359,8 +359,8 @@ if st.session_state.page == "Production Schedule":
     st.title("Scheduling Dashboard")
 
     # Fetch data from API endpoints
-    schedule_response = requests.get("http://172.18.101.47:4567/schedule/")
-    daily_production_response = requests.get("http://172.18.101.47:4567/daily_production/")
+    schedule_response = requests.get("http://172.18.7.85:5609/schedule/")
+    daily_production_response = requests.get("http://172.18.7.85:5609/daily_production/")
 
     if schedule_response.status_code == 200 and daily_production_response.status_code == 200:
         schedule_data = schedule_response.json()
@@ -475,7 +475,7 @@ if st.session_state.page == "Production Schedule":
                         "time": time
                     }]
                 }
-                response = requests.post("http://172.18.101.47:4567/post_operations/", json=operation_data)
+                response = requests.post("http://172.18.7.85:5609/post_operations/", json=operation_data)
                 if response.status_code == 200:
                     st.success("Operation added successfully!")
                 else:
@@ -498,8 +498,8 @@ elif st.session_state.page == "Component & Lead Time":
                 quantity = st.number_input("Stock Quantity", min_value=0, value=0)
                 submitted = st.form_submit_button("Update Inventory")
                 if submitted:
-                    data = {"quantities": [{"component": component, "quantity": quantity}]}
-                    response = requests.post("http://172.18.101.47:4567/insert_component_quantities/", json=data)
+                    data = [{"component": component, "quantity": quantity}]
+                    response = requests.post("http://172.18.7.85:5609/insert_component_quantities/", json=data)
                     if response.status_code == 200:
                         st.success(f"Inventory updated for {component}")
                     else:
@@ -514,8 +514,8 @@ elif st.session_state.page == "Component & Lead Time":
                 submitted = st.form_submit_button("Set Lead Time")
                 if submitted:
                     due_datetime = datetime.combine(due_date, due_time)
-                    data = {"lead_times": [{"component": lead_time_component, "due_date": due_datetime.isoformat()}]}
-                    response = requests.post("http://172.18.101.47:4567/insert_lead_times/", json=data)
+                    data = [{"component": lead_time_component, "due_date": due_datetime.isoformat()}]
+                    response = requests.post("http://172.18.7.85:5609/insert_lead_times/", json=data)
                     if response.status_code == 200:
                         st.success(f"Lead time configured for {lead_time_component}")
                     else:
@@ -528,7 +528,7 @@ elif st.session_state.page == "Component & Lead Time":
 
         with col1:
             st.subheader("Current Inventory Levels")
-            quantities_response = requests.get("http://172.18.101.47:4567/fetch_component_quantities/")
+            quantities_response = requests.get("http://172.18.7.85:5609/fetch_component_quantities/")
             if quantities_response.status_code == 200:
                 quantities = quantities_response.json()
                 quantities_df = pd.DataFrame(list(quantities.items()), columns=['Component', 'Stock'])
@@ -538,7 +538,7 @@ elif st.session_state.page == "Component & Lead Time":
 
         with col2:
             st.subheader("Component Lead Times")
-            lead_times_response = requests.get("http://172.18.101.47:4567/lead-time-table")
+            lead_times_response = requests.get("http://172.18.7.85:5609/lead-time-table")
             if lead_times_response.status_code == 200:
                 lead_times = lead_times_response.json()
                 lead_times_df = pd.DataFrame(lead_times)
@@ -551,7 +551,7 @@ elif st.session_state.page == "Analytics":
     st.title("Production Analytics")
 
     # Fetch component status data
-    component_status_response = requests.get("http://172.18.101.47:4567/component_status/")
+    component_status_response = requests.get("http://172.18.7.85:5609/component_status/")
     if component_status_response.status_code == 200:
         component_status = component_status_response.json()
 
