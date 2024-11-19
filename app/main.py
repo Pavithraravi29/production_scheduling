@@ -1,3 +1,5 @@
+import os
+from fastapi.staticfiles import StaticFiles
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database.config import configure_database
@@ -25,4 +27,4 @@ app.include_router(leadtime.router, tags=["leadtime"])
 
 
 # TO RUN
-# uvicorn app.main:app --host 172.18.101.47 --port 4567 --reload
+# uvicorn app.main:app --host 172.18.7.85 --port 4567 --reload

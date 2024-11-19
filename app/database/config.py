@@ -6,7 +6,7 @@ def configure_database():
         provider='postgres',
         user='postgres',
         password='password',
-        host='localhost',
+        host='172.18.7.85',
         database='schedulingalgo'
     )
     db.generate_mapping(create_tables=True)
