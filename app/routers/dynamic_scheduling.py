@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 
 from app.algorithms.scheduling import schedule_operations
@@ -29,14 +29,19 @@ async def read_machine_statuses():
     return fetch_machine_statuses()
 
 @router.put("/raw_materials/{raw_material_id}", response_model=RawMaterialOut)
-async def update_raw_material_status(raw_material_id: int, available: bool, available_from: datetime = None):
+async def update_raw_material_status(
+    raw_material_id: int,
+    available: bool,
+    available_from: Optional[datetime] = None
+):
     result = update_raw_material(raw_material_id, available, available_from)
     # Call scheduling function to update the schedule
     schedule_operations(fetch_operations(), fetch_component_quantities(), fetch_lead_times())
     return result
 
+
 @router.put("/machine_statuses/{machine_id}", response_model=MachineStatusOut)
-async def update_machine_status_endpoint(machine_id: int, status: str, available_from: datetime = None):
+async def update_machine_status_endpoint(machine_id: int, status: str, available_from: Optional[datetime] = None):
     result = update_machine_status(machine_id, status, available_from)
     # Call scheduling function to update the schedule
     schedule_operations(fetch_operations(), fetch_component_quantities(), fetch_lead_times())

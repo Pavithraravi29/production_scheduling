@@ -24,10 +24,17 @@ def fetch_raw_materials() -> List[RawMaterialOut]:
     return [RawMaterialOut(id=rm.id, name=rm.name, available=rm.available, available_from=rm.available_from) for rm in RawMaterial.select()]
 
 @db_session
-def update_raw_material(raw_material_id: int, available: bool) -> RawMaterialOut:
+def update_raw_material(raw_material_id: int, available: bool, available_from: Optional[datetime] = None) -> RawMaterialOut:
     rm = RawMaterial[raw_material_id]
     rm.available = available
-    return RawMaterialOut(id=rm.id, name=rm.name, available=rm.available, available_from=rm.available_from)
+    if available_from:
+        rm.available_from = available_from
+    return RawMaterialOut(
+        id=rm.id,
+        name=rm.name,
+        available=rm.available,
+        available_from=rm.available_from
+    )
 
 @db_session
 def insert_machine_statuses(statuses: List[MachineStatusIn]) -> List[MachineStatusOut]:
@@ -43,7 +50,14 @@ def fetch_machine_statuses() -> List[MachineStatusOut]:
     return [MachineStatusOut(id=ms.id, machine=ms.machine, status=ms.status, available_from=ms.available_from) for ms in MachineStatus.select()]
 
 @db_session
-def update_machine_status(machine_id: int, status: str) -> MachineStatusOut:
+def update_machine_status(machine_id: int, status: str, available_from: Optional[datetime] = None) -> MachineStatusOut:
     ms = MachineStatus[machine_id]
     ms.status = status
-    return MachineStatusOut(id=ms.id, machine=ms.machine, status=ms.status, available_from=ms.available_from)
+    if available_from:
+        ms.available_from = available_from
+    return MachineStatusOut(
+        id=ms.id,
+        machine=ms.machine,
+        status=ms.status,
+        available_from=ms.available_from
+    )
